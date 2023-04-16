@@ -1,6 +1,9 @@
 import amqp from 'amqplib';
+import { config } from 'dotenv';
 
-const url = 'amqps://xonzmodr:6n_tn1QctLqQURxoTGV_8GQatKhSisGX@puffin.rmq2.cloudamqp.com/xonzmodr';
+config();
+
+const url = process.env.RABBITMQ_URL || '';
 
 export const connectQueue = async () => {
   const connection = await amqp.connect(url);
