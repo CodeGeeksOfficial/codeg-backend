@@ -7,6 +7,48 @@ const codeRouter = express.Router();
 
 const LANGUAGES = ["cpp", "java", "py", "js"];
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     payload:run:
+ *       type: object
+ *       required:
+ *         - language
+ *         - code
+ *       properties:
+ *         language:
+ *           type: "string"
+ *         code:
+ *           type: string
+ *         timeout:
+ *           type: number
+ */
+
+
+/**
+ * @swagger
+ * /code/run:
+ *   post:
+ *     summary: run code API
+ *     description: Post the code with payload containing language, code and timeout
+ *     tags:
+ *       - code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/payload:run'
+ *     responses:
+ *       200:
+ *         description: A process id of the submitted code
+ *       400:
+ *         description: Invalid request payload
+ *       500:
+ *         description: Internal Server Error
+ */
+
 codeRouter.post("/run", async (req, res) => {
   const folder_name = randomBytes(20).toString("hex"); // Random Folder name
   try {
@@ -55,6 +97,29 @@ codeRouter.post("/run", async (req, res) => {
 
   res.send(folder_name);
 })
+
+
+/**
+ * @swagger
+ * /code/status/{id}:
+ *   get:
+ *     summary: Get status of submitted code request
+ *     description: Retrieve a status of submitted code by process id
+ *     tags:
+ *       - code
+ *     parameters:
+ *       - name: id
+ *         description: ID of the code process to retrieve
+ *         in: path
+ *         required: true
+ *         type: integer
+ *         format: int64
+ *     produces:
+ *       - application/json
+ *     responses:
+ *       200:
+ *         description: A code output or execution status
+ */
 
 codeRouter.get("/status/:id", async (req, res) => {
   let key = req.params.id
