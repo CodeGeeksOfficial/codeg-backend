@@ -42,13 +42,13 @@ userRouter.get('/allusers', (req, res) => {
 
 userRouter.post('/update-user', (req, res) => {
   const db = admin.firestore();
+  const uuid = req.body.uuid;
 
-  const newUser = {
-    name: req.body.name,
-    email: req.body.email,
-  };
+  if (!uuid) {
+    return res.status(400).send('UUID Required');
+  }
 
-  db.collection('users').doc("ABC").set(newUser)
+  db.collection('users').doc(uuid).set(req.body)
     .then((docRef) => {
       console.log('User added with ID:', docRef);
       res.status(201).send('User created successfully');
