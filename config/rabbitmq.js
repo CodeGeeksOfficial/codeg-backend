@@ -1,15 +1,15 @@
-import amqp from 'amqplib';
-import { config } from 'dotenv';
+const amqp = require('amqplib');
+const { config } = require('dotenv');
 
 config();
 
 const url = process.env.RABBITMQ_URL || '';
 
-export const connectQueue = async () => {
+const connectQueue = async () => {
   const connection = await amqp.connect(url);
   const channel = await connection.createChannel();
   channel.assertQueue("jobs");
   return channel;
 }
 
-export default connectQueue;
+module.exports = { connectQueue };

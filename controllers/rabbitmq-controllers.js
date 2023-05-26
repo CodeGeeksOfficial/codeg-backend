@@ -1,8 +1,8 @@
-import { connectQueue } from "../config/rabbitmq";
+const { connectQueue } = require("../config/rabbitmq");
 
-let queueChannel: any;
+let queueChannel;
 
-export const sendInQueue = async (data: string) => {
+const sendInQueue = async (data) => {
   if (queueChannel) { // Queue channel is connected
     try {
       queueChannel.sendToQueue("jobs", Buffer.from(data));
@@ -14,3 +14,5 @@ export const sendInQueue = async (data: string) => {
     sendInQueue(data);
   }
 };
+
+module.exports = { sendInQueue }

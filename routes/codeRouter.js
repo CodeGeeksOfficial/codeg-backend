@@ -1,7 +1,7 @@
-import express from 'express';
-import { getKey, setKey } from '../controllers/redis-controllers'
-import { sendInQueue } from '../controllers/rabbitmq-controllers'
-import { randomBytes } from 'crypto';
+const express = require('express');
+const { getKey, setKey } = require('../controllers/redis-controllers')
+const { sendInQueue } = require('../controllers/rabbitmq-controllers')
+const { randomBytes } = require('crypto');
 
 const codeRouter = express.Router();
 
@@ -136,4 +136,4 @@ codeRouter.get("/status/:id", async (req, res) => {
   }
 });
 
-export default codeRouter;
+module.exports = codeRouter;

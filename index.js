@@ -1,14 +1,14 @@
-import dotenv from 'dotenv';
-import express, { Application, NextFunction, Request, Response } from 'express';
-import cors from 'cors';
-import codeRouter from './routes/codeRouter'
-import swaggerUi from 'swagger-ui-express';
-import swaggerOptions from './config/swagger'
-import swaggerJsdoc from 'swagger-jsdoc';
+const dotenv = require('dotenv');
+const express = require('express');
+const cors = require('cors');
+const codeRouter = require('./routes/codeRouter')
+const swaggerUi = require('swagger-ui-express')
+const swaggerOptions = require('./config/swagger')
+const swaggerJsdoc = require('swagger-jsdoc')
 
 dotenv.config();
 const swaggerSpecs = swaggerJsdoc(swaggerOptions);
-const app: Application = express();
+const app = express();
 const PORT = process.env.PORT || 7000;
 
 app.use(express.urlencoded({ extended: true }));
