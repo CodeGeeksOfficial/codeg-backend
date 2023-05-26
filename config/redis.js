@@ -1,5 +1,5 @@
-import Redis from "ioredis";
-import { config } from 'dotenv';
+const Redis = require("ioredis");
+const { config } = require('dotenv');
 
 config();
 
@@ -10,4 +10,4 @@ process.on('exit', () => {
   client.quit();
 });
 
-export default client;
+module.exports = client;

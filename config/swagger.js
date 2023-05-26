@@ -9,4 +9,4 @@ const options = {
   apis: ['./routes/codeRouter.ts'], // Path to the API docs
 };
 
-export default options;
+module.exports = options;
