@@ -35,7 +35,7 @@ questionRouter.get('/all-questions', (req, res) => {
     .then((snapshot) => {
       const questions = [];
       snapshot.forEach((doc) => {
-        questions.push(doc.data());
+        questions.push({ id: doc.id, ...doc.data() });
       });
       res.json(questions);
     })
