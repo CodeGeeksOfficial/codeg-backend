@@ -45,6 +45,50 @@ questionRouter.get('/all-questions', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /question/get-question-by-id:
+ *   get:
+ *     summary: Get question by id
+ *     tags:
+ *       - question
+ *     parameters:
+ *       - in: query
+ *         name: question_id
+ *         type: string
+ *         required: true
+ *     produces:
+ *       - application/json
+ *     responses:
+ *       200:
+ *         description: An object of question
+ */
+questionRouter.get('/get-question-by-id', (req, res) => {
+  const db = admin.firestore();
+
+  const questionId = req.query.question_id;
+
+  if (!questionId) {
+    return res.status(400).send('Question Id Required');
+  }
+
+  const questionRef = db.collection('questions').doc(questionId);
+  questionRef
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        const questionData = doc.data();
+        res.status(200).json(questionData);
+      } else {
+        res.status(404).send('Question not found');
+      }
+    })
+    .catch((error) => {
+      console.error('Error getting question:', error);
+      res.status(500).send('Internal Server Error');
+    });
+});
+
 
 /**
  * @swagger
