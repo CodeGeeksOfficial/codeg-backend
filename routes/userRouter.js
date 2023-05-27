@@ -4,25 +4,36 @@ const userRouter = express.Router();
 
 /**
  * @swagger
- * /users/all:
+ * components:
+ *   schemas:
+ *     payload:user:
+ *       type: object
+ *       required:
+ *         - uuid
+ *       properties:
+ *         uuid:
+ *           type: "string"
+ *         email:
+ *            type: "string"
+ *         others:
+ *            type: "any"
+ */
+
+
+/**
+ * @swagger
+ * /user/all-users:
  *   get:
  *     summary: Get all users
  *     tags:
- *       - code
- *     parameters:
- *       - name: id
- *         description: ID of the code process to retrieve
- *         in: path
- *         required: true
- *         type: integer
- *         format: int64
+ *       - user
  *     produces:
  *       - application/json
  *     responses:
  *       200:
- *         description: A code output or execution status
+ *         description: A list of all users
  */
-userRouter.get('/allusers', (req, res) => {
+userRouter.get('/all-users', (req, res) => {
   const db = admin.firestore();
 
   // Access Firestore collections and documents as needed
@@ -39,6 +50,29 @@ userRouter.get('/allusers', (req, res) => {
       res.status(500).send('Internal Server Error');
     });
 });
+
+/**
+ * @swagger
+ * /user/update-user:
+ *   post:
+ *     summary: update or create an user in db
+ *     description: updates and existing user or creates one with uuid
+ *     tags:
+ *       - user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/payload:user'
+ *     responses:
+ *       200:
+ *         description: User created successfully
+ *       400:
+ *         description: UUID Not Received
+ *       500:
+ *         description: Internal Server Error
+ */
 
 userRouter.post('/update-user', (req, res) => {
   const db = admin.firestore();
