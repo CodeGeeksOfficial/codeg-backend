@@ -22,7 +22,7 @@ const userRouter = express.Router();
 
 /**
  * @swagger
- * /user/allusers:
+ * /user/all-users:
  *   get:
  *     summary: Get all users
  *     tags:
@@ -33,7 +33,7 @@ const userRouter = express.Router();
  *       200:
  *         description: A list of all users
  */
-userRouter.get('/allusers', (req, res) => {
+userRouter.get('/all-users', (req, res) => {
   const db = admin.firestore();
 
   // Access Firestore collections and documents as needed
