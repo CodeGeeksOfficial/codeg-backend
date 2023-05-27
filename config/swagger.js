@@ -6,7 +6,7 @@ const options = {
       version: '1.0.0',
     },
   },
-  apis: ['./routes/codeRouter.ts'], // Path to the API docs
+  apis: ['./routes/*.js'], // Path to the API docs
 };
 
 module.exports = options;
