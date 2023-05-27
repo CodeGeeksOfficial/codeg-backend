@@ -8,7 +8,8 @@ const url = process.env.RABBITMQ_URL || '';
 const connectQueue = async () => {
   const connection = await amqp.connect(url);
   const channel = await connection.createChannel();
-  channel.assertQueue("jobs");
+  channel.assertQueue("singleExecutionJobs");
+  channel.assertQueue("multiExecutionJobs");
   return channel;
 }
 
