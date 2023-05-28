@@ -115,7 +115,7 @@ codeRouter.post("/run", async (req, res) => {
  *           type: string
  *         timeout:
  *           type: number
- *         test-inputs:
+ *         test_inputs:
  *           type: "array<any>"
  */
 
