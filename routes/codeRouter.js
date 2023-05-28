@@ -124,7 +124,7 @@ codeRouter.post("/run", async (req, res) => {
  * /code/question-run:
  *   post:
  *     summary: run code API for question
- *     description: Post the code with payload containing language, code and timeout and question_id as param
+ *     description: Post the code with payload containing language, code, test_inputs and timeout and question_id as param
  *     tags:
  *       - code
  *     parameters:
@@ -191,7 +191,6 @@ codeRouter.post("/question-run", async (req, res) => {
     }
 
     const db = admin.firestore();
-    console.log(question_id);
     const questionRef = db.collection('questions').doc(question_id);
     const doc = await questionRef.get();
     if (doc.exists) {
@@ -206,7 +205,99 @@ codeRouter.post("/question-run", async (req, res) => {
     await setKey(folder_name, "Queued");
 
     console.log(`Request ${folder_name} received - multiExecutionJobs`);
-    console.log(data);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ error: `Internal Server Error: ${err}` });
+  }
+
+  res.status(200).send(folder_name);
+})
+
+/**
+ * @swagger
+ * /code/question-submit:
+ *   post:
+ *     summary: submit code API for question
+ *     description: Post the code with payload containing language, code and timeout and question_id as param
+ *     tags:
+ *       - code
+ *     parameters:
+ *       - in: query
+ *         name: question_id
+ *         type: string
+ *         required: true
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/payload:question-run'
+ *     responses:
+ *       200:
+ *         description: A process id of the submitted code
+ *       400:
+ *         description: Invalid request payload
+ *       500:
+ *         description: Internal Server Error
+ */
+
+codeRouter.post("/question-submit", async (req, res) => {
+  const folder_name = randomBytes(20).toString("hex"); // Random Folder name
+  try {
+    const question_id = req.query.question_id;
+    if (!question_id) {
+      return res.status(400).send({ error: "Question Id is required" });
+    }
+
+    // Extract Data received from the request body
+    let data = {
+      input_code: {
+        language: req.body.language,
+        code: req.body.code,
+      },
+      folder_name: folder_name,
+      timeout: req.body.timeout,
+    };
+
+    // If language is not received, return 400 BAD Request
+    if (data.input_code.language === undefined) {
+      return res.status(400).send({ error: "Language Not Received" });
+    }
+
+    if (!LANGUAGES.includes(data.input_code.language)) {
+      return res.status(400).send({ error: "Language Not Supported" });
+    }
+
+    // If code is not received, return 400 BAD Request
+    if (data.input_code.code === undefined) {
+      return res.status(400).send({ error: "Code Not Received" });
+    }
+
+    // If timeout is not received, set it to 15 sec
+    if (data.timeout === undefined) {
+      data.timeout = 15000;
+    }
+
+    const db = admin.firestore();
+    const questionRef = db.collection('questions').doc(question_id);
+    const doc = await questionRef.get();
+    if (doc.exists) {
+      const questionData = doc.data();
+      if (questionData.testcases && questionData.solution) {
+        data.solution = questionData.solution[0];
+        data.test_inputs = questionData.testcases;
+      } else {
+        return res.status(500).send('Invalid Question in db');
+      }
+    } else {
+      return res.status(404).send('Question not found');
+    }
+
+    // *** Prepare data and Push in Queue *** //
+    await sendInQueue("multiExecutionJobs", JSON.stringify(data));
+    await setKey(folder_name, "Queued");
+
+    console.log(`Request ${folder_name} received - multiExecutionJobs`);
   } catch (err) {
     console.log(err);
     return res.status(500).send({ error: `Internal Server Error: ${err}` });
