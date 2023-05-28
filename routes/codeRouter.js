@@ -99,7 +99,25 @@ codeRouter.post("/run", async (req, res) => {
   res.send(folder_name);
 })
 
-
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     payload:question-run:
+ *       type: object
+ *       required:
+ *         - language
+ *         - code
+ *       properties:
+ *         language:
+ *           type: string
+ *         code:
+ *           type: string
+ *         timeout:
+ *           type: number
+ *         test-inputs:
+ *           type: "array<any>"
+ */
 
 /**
  * @swagger
@@ -119,7 +137,7 @@ codeRouter.post("/run", async (req, res) => {
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/payload:run'
+ *             $ref: '#/components/schemas/payload:question-run'
  *     responses:
  *       200:
  *         description: A process id of the submitted code
