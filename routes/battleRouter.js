@@ -6,18 +6,37 @@ const battleRouter = express.Router()
 
 /**
  * @swagger
+ * components:
+ *   schemas:
+ *     payload:battle:
+ *       type: object
+ *       required:
+ *         - admin_id
+ *         - is_private
+ *         - time_validity
+ *       properties:
+ *         admin_id:
+ *            type: "string"
+ *         is_private:
+ *            type: "boolean"
+ *         time_validity:
+ *            type: "number"
+ */
+
+/**
+ * @swagger
  * /battle/create-battle:
  *   post:
  *     summary: create a battle in db
  *     description: creates a battle in db
  *     tags:
- *       - properties
+ *       - battle
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/payload:properties'
+ *             $ref: '#/components/schemas/payload:battle'
  *     responses:
  *       200:
  *         description: Battle created successfully
@@ -39,7 +58,7 @@ battleRouter.post("/create-room", async (req,res) => {
     createdAt : new Date(),
     isPrivate : req.body.is_private,
     timeValidity : req.body.time_validity,
-    users : usersData,
+    players : usersData,
   }
 
   const newBattleRef = db.collection('battles').doc();  // creates a new battle doc with auto-generated id
