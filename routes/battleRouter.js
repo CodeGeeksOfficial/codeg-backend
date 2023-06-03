@@ -44,7 +44,7 @@ const battleRouter = express.Router()
  *         description: Internal Server Error
  */
 
-battleRouter.post("/create-room", async (req,res) => {
+battleRouter.post("/create-battle", async (req,res) => {
   const db = admin.firestore();
 
   let usersData = [
