@@ -7,6 +7,7 @@ const cors = require('cors');
 const codeRouter = require('./routes/codeRouter')
 const userRouter = require('./routes/userRouter')
 const questionRouter = require('./routes/questionRouter');
+const battleRouter = require('./routes/battleRouter');
 
 // Swagger Imports
 const swaggerUi = require('swagger-ui-express')
@@ -38,6 +39,7 @@ app.use(cors());
 app.use("/question", questionRouter);
 app.use("/user", userRouter);
 app.use("/code", codeRouter);
+app.use("/battle",battleRouter)
 app.use('/', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 // Start Listening
