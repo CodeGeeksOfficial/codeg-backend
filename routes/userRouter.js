@@ -1,5 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const { decodeAccessToken } = require('../utils/firebase-utils');
 const userRouter = express.Router();
 
 /**
@@ -73,7 +74,6 @@ userRouter.get('/all-users', (req, res) => {
  *       500:
  *         description: Internal Server Error
  */
-
 userRouter.post('/update-user', (req, res) => {
   const db = admin.firestore();
   const uuid = req.body.uuid;
@@ -91,6 +91,48 @@ userRouter.post('/update-user', (req, res) => {
       console.error('Error adding user:', error);
       res.status(500).send('Internal Server Error');
     });
+});
+
+
+/**
+ * @swagger
+ * /user/get-battle-id:
+ *   get:
+ *     summary: Get current battle of the user
+ *     tags:
+ *       - user
+ *     security:
+ *       - bearerAuth: []
+ *     produces:
+ *       - application/json
+ *     responses:
+ *       200:
+ *         description: The current battle id of the user
+ */
+userRouter.get('/get-battle-id', async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    try {
+      const db = admin.firestore();
+      const battlesRef = db.collection('battles');
+      const snapshot = await battlesRef.where('users', 'array-contains', decodedToken.user_id).limit(1).get();
+      if (snapshot.empty) {
+        return res.send(null);
+      } else {
+        const userBattles = snapshot.docs;
+        return res.send(userBattles[0].id);
+      }
+    } catch (error) {
+      console.error('Error retrieving user battle:', error);
+      return res.status(500).send('Internal Server Error');
+    }
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
+  }
+
 });
 
 module.exports = userRouter;
