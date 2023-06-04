@@ -13,12 +13,15 @@ const battleRouter = express.Router()
  *       required:
  *         - admin_id
  *         - is_private
+ *         - battle_name
  *         - time_validity
  *       properties:
  *         admin_id:
  *            type: "string"
  *         is_private:
  *            type: "boolean"
+ *         battle_name:
+ *            type: "string"
  *         time_validity:
  *            type: "number"
  */
@@ -57,6 +60,7 @@ battleRouter.post("/create-battle", async (req,res) => {
   let data = {
     createdAt : new Date(),
     isPrivate : req.body.is_private,
+    name: req.body.battle_name,
     timeValidity : req.body.time_validity,
     players : usersData,
   }
