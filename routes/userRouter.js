@@ -83,7 +83,7 @@ userRouter.post('/create-user', async (req, res) => {
       let userDefaultData = {
         email: decodedToken.email,
         name: decodedToken.name,
-        photoUrl: decodedToken.picture
+        photoURL: decodedToken.picture
       }
 
       db.collection('users').doc(uid).set(userDefaultData)
