@@ -1,6 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
-
+const { decodeAccessToken } = require('../utils/firebase-utils');
 
 const battleRouter = express.Router()
 
@@ -34,6 +34,8 @@ const battleRouter = express.Router()
  *     description: creates a battle in db
  *     tags:
  *       - battle
+ *     security:
+ *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
  *     requestBody:
  *       required: true
  *       content:
@@ -47,33 +49,44 @@ const battleRouter = express.Router()
  *         description: Internal Server Error
  */
 
-battleRouter.post("/create-battle", async (req,res) => {
-  const db = admin.firestore();
+battleRouter.post("/create-battle", async (req, res) => {
 
-  let usersData = [
-    {
-      id : req.body.admin_id,
-      score : 0
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    const db = admin.firestore();
+
+    let usersData = [
+      {
+        id: decodedToken.user_id,
+        score: 0
+      }
+    ]
+
+    let data = {
+      createdAt: new Date(),
+      isPrivate: req.body.is_private,
+      users: [decodedToken.user_id],
+      name: req.body.battle_name,
+      timeValidity: req.body.time_validity,
+      players: usersData,
     }
-  ]
 
-  let data = {
-    createdAt : new Date(),
-    isPrivate : req.body.is_private,
-    name: req.body.battle_name,
-    timeValidity : req.body.time_validity,
-    players : usersData,
+    const newBattleRef = db.collection('battles').doc();  // creates a new battle doc with auto-generated id
+
+    newBattleRef.set(data).then((docRef) => {
+      console.log('Battle created with ID: ', newBattleRef.id);
+      res.status(201).send(newBattleRef.id);
+    }).catch((error) => {
+      console.error('Error creating battle:', error);
+      res.status(500).send('Internal Server Error');
+    });
+
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
   }
-
-  const newBattleRef = db.collection('battles').doc();  // creates a new battle doc with auto-generated id
-
-  newBattleRef.set(data).then((docRef)=>{
-    console.log('Battle created with ID: ', docRef);
-    res.status(201).send('Battle created successfully');
-  }).catch((error)=>{
-    console.error('Error creating battle:', error);
-    res.status(500).send('Internal Server Error');
-  });
 })
 
 module.exports = battleRouter;

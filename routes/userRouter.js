@@ -1,5 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const { decodeAccessToken } = require('../utils/firebase-utils');
 const userRouter = express.Router();
 
 /**
@@ -8,12 +9,12 @@ const userRouter = express.Router();
  *   schemas:
  *     payload:user:
  *       type: object
- *       required:
- *         - uuid
  *       properties:
- *         uuid:
- *           type: "string"
+ *         name:
+ *            type: "string"
  *         email:
+ *            type: "string"
+ *         photoUrl:
  *            type: "string"
  *         others:
  *            type: "any"
@@ -53,12 +54,68 @@ userRouter.get('/all-users', (req, res) => {
 
 /**
  * @swagger
- * /user/update-user:
+ * /user/create-user:
  *   post:
- *     summary: update or create an user in db
- *     description: updates and existing user or creates one with uuid
+ *     summary: Create a new user
+ *     description: creates a new user in firestore db
  *     tags:
  *       - user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: New user created successfully
+ *       401:
+ *         description: Error verifying access token
+ *       500:
+ *         description: Internal Server Error
+ */
+
+userRouter.post('/create-user',async (req,res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    try {
+      const db = admin.firestore();
+      const uid = decodedToken.uid
+
+      let userDefaultData = {
+        email:decodedToken.email,
+        name:decodedToken.name,
+        photoUrl:decodedToken.picture
+      }
+
+      db.collection('users').doc(uid).set(userDefaultData)
+      .then((docRef) => {
+        console.log('New user added with ID:', docRef);
+        res.status(201).send('New user created successfully');
+      })
+      .catch((error) => {
+        console.error('Error adding new user:', error);
+        res.status(500).send('Internal Server Error');
+      })
+
+    } catch (error) {
+      console.error('Error retrieving user data:', error);
+      return res.status(500).send('Internal Server Error');
+    }
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
+  }
+})
+
+/**
+ * @swagger
+ * /user/update-user:
+ *   post:
+ *     summary: Update user data
+ *     description: updates an existing user data in firestore
+ *     tags:
+ *       - user
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -67,30 +124,85 @@ userRouter.get('/all-users', (req, res) => {
  *             $ref: '#/components/schemas/payload:user'
  *     responses:
  *       200:
- *         description: User created successfully
- *       400:
- *         description: UUID Not Received
+ *         description: User updated successfully
+ *       401:
+ *         description: Error verifying access token
  *       500:
  *         description: Internal Server Error
  */
+userRouter.post('/update-user', async (req, res) => {
+  const accessToken = req.headers.authorization;
 
-userRouter.post('/update-user', (req, res) => {
-  const db = admin.firestore();
-  const uuid = req.body.uuid;
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    try {
+      const db = admin.firestore();
+      const uuid = decodedToken.user_id
 
-  if (!uuid) {
-    return res.status(400).send('UUID Required');
+      db.collection('users').doc(uuid).set(req.body)
+      .then((docRef) => {
+        console.log('User updated with ID:', docRef);
+        res.status(201).send('User data updated successfully');
+      })
+      .catch((error) => {
+        console.error('Error updating user:', error);
+        res.status(500).send('Internal Server Error');
+      });
+    } catch (error) {
+      console.error('Error retrieving user data:', error);
+      return res.status(500).send('Internal Server Error');
+    }
+
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
+  }
+});
+
+
+/**
+ * @swagger
+ * /user/get-battle-id:
+ *   get:
+ *     summary: Get current battle of the user
+ *     tags:
+ *       - user
+ *     security:
+ *       - bearerAuth: []
+ *     produces:
+ *       - application/json
+ *     responses:
+ *       200:
+ *         description: The current battle id of the user
+ *       401:
+ *         description: Error verifying access token
+ *       500:
+ *         description: Internal Server Error
+ */
+userRouter.get('/get-battle-id', async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    try {
+      const db = admin.firestore();
+      const battlesRef = db.collection('battles');
+      const snapshot = await battlesRef.where('users', 'array-contains', decodedToken.user_id).limit(1).get();
+      if (snapshot.empty) {
+        return res.send(null);
+      } else {
+        const userBattles = snapshot.docs;
+        return res.send(userBattles[0].id);
+      }
+    } catch (error) {
+      console.error('Error retrieving user battle:', error);
+      return res.status(500).send('Internal Server Error');
+    }
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
   }
 
-  db.collection('users').doc(uuid).set(req.body)
-    .then((docRef) => {
-      console.log('User added with ID:', docRef);
-      res.status(201).send('User created successfully');
-    })
-    .catch((error) => {
-      console.error('Error adding user:', error);
-      res.status(500).send('Internal Server Error');
-    });
 });
 
 module.exports = userRouter;
