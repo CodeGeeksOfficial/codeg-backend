@@ -71,7 +71,7 @@ userRouter.get('/all-users', (req, res) => {
  *         description: Internal Server Error
  */
 
-userRouter.post('/create-user',async (req,res) => {
+userRouter.post('/create-user', async (req, res) => {
   const accessToken = req.headers.authorization;
 
   try {
@@ -81,20 +81,20 @@ userRouter.post('/create-user',async (req,res) => {
       const uid = decodedToken.uid
 
       let userDefaultData = {
-        email:decodedToken.email,
-        name:decodedToken.name,
-        photoURL:decodedToken.picture
+        email: decodedToken.email,
+        name: decodedToken.name,
+        photoURL: decodedToken.picture
       }
 
       db.collection('users').doc(uid).set(userDefaultData)
-      .then((docRef) => {
-        console.log('New user added with ID:', docRef);
-        res.status(201).send('New user created successfully');
-      })
-      .catch((error) => {
-        console.error('Error adding new user:', error);
-        res.status(500).send('Internal Server Error');
-      })
+        .then((docRef) => {
+          console.log('New user added with ID:', docRef);
+          res.status(201).send('New user created successfully');
+        })
+        .catch((error) => {
+          console.error('Error adding new user:', error);
+          res.status(500).send('Internal Server Error');
+        })
 
     } catch (error) {
       console.error('Error retrieving user data:', error);
@@ -140,14 +140,14 @@ userRouter.post('/update-user', async (req, res) => {
       const uuid = decodedToken.user_id
 
       db.collection('users').doc(uuid).set(req.body)
-      .then((docRef) => {
-        console.log('User updated with ID:', docRef);
-        res.status(201).send('User data updated successfully');
-      })
-      .catch((error) => {
-        console.error('Error updating user:', error);
-        res.status(500).send('Internal Server Error');
-      });
+        .then((docRef) => {
+          console.log('User updated with ID:', docRef);
+          res.status(201).send('User data updated successfully');
+        })
+        .catch((error) => {
+          console.error('Error updating user:', error);
+          res.status(500).send('Internal Server Error');
+        });
     } catch (error) {
       console.error('Error retrieving user data:', error);
       return res.status(500).send('Internal Server Error');
@@ -189,7 +189,7 @@ userRouter.get('/get-battle-id', async (req, res) => {
       const battlesRef = db.collection('battles');
       const snapshot = await battlesRef.where('users', 'array-contains', decodedToken.user_id).limit(1).get();
       if (snapshot.empty) {
-        return res.send(null);
+        return res.json(null);
       } else {
         const userBattles = snapshot.docs;
         return res.send(userBattles[0].id);
