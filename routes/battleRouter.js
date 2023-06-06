@@ -89,4 +89,87 @@ battleRouter.post("/create-battle", async (req, res) => {
   }
 })
 
+/**
+ * @swagger
+ * /battle/join-battle:
+ *   get:
+ *     summary: Join a battle in db
+ *     description: joins a battle in db
+ *     tags:
+ *       - battle
+ *     security:
+ *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
+ *     parameters:
+ *       - name: battle_id
+ *         description: Battle id
+ *         in: query
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: Battle created successfully
+ *       401:
+ *         description: Error verifying access token
+ *       500:
+ *         description: Internal Server Error
+ */
+
+battleRouter.get("/join-battle",async (req,res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    const db = admin.firestore();
+
+    const battleId = req.query.battle_id;
+  
+    if (!battleId) {
+      return res.status(400).send('Battle Id Required');
+    }
+    
+    // Check if doc for battleID exists
+    const battlesCollectionRef = db.collection('battles');
+    const battleDocRef = battlesCollectionRef.doc(battleId);
+    battleDocRef
+      .get()
+      .then(async (doc) => {
+        if (doc.exists) {
+          const battleData = doc.data();
+
+          // Check if user already in battleId
+          const snapshot = await battlesCollectionRef.where('users', 'array-contains', decodedToken.user_id).limit(1).get();
+          if (snapshot.empty) {
+            // Check if battle already started or not
+            if(battleData.startedAt){
+              // console.log("Battle already started !!")
+              return res.json(null);
+            }else{
+              battleDocRef.update({
+                players:[...battleData.players,{id:decodedToken.uid,score:0}],
+                users:[...battleData.users,decodedToken.uid]
+              }).then(()=>{
+                // Join new user to battleId successfully
+                return res.json(battleId);
+              }).catch(()=>{
+                return res.json(null);
+              })
+            }
+          } else {
+            // Rejoin user to old battle
+            const userBattles = snapshot.docs;
+            return res.send(userBattles[0].id);
+          }
+        } else {
+          return res.status(404).send('Battle not found');
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting battle data:', error);
+        return res.status(500).send('Internal Server Error');
+      });
+  }catch(error){
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
+  }
+})
 module.exports = battleRouter;
