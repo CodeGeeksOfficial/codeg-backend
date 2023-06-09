@@ -155,9 +155,10 @@ battleRouter.get("/join-battle",async (req,res) => {
               })
             }
           } else {
-            // Rejoin user to old battle
-            const userBattles = snapshot.docs;
-            return res.send(userBattles[0].id);
+            // console.log("User already in a battle !!")
+            return res.json(null);
+            // const userBattles = snapshot.docs;
+            // return res.send(userBattles[0].id);
           }
         } else {
           return res.status(404).send('Battle not found');

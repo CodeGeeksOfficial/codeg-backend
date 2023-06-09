@@ -215,7 +215,7 @@ userRouter.get('/get-battle-id', async (req, res) => {
  *     produces:
  *       - application/json
  *     parameters:
- *       - name: id
+ *       - name: user_id
  *         description: ID of the user
  *         in: query
  *         required: true
@@ -234,7 +234,7 @@ userRouter.get('/get-battle-id', async (req, res) => {
 userRouter.get('/get-details-by-id', async (req, res) => {
   const db = admin.firestore();
 
-  const userId = req.query.id;
+  const userId = req.query.user_id;
 
   if (!userId) {
     return res.status(400).send('User Id Required');
