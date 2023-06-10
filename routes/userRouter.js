@@ -187,7 +187,7 @@ userRouter.get('/get-battle-id', async (req, res) => {
     try {
       const db = admin.firestore();
       const battlesRef = db.collection('battles');
-      const snapshot = await battlesRef.where('users', 'array-contains', decodedToken.user_id).limit(1).get();
+      const snapshot = await battlesRef.where('activeUsers', 'array-contains', decodedToken.user_id).limit(1).get();
       if (snapshot.empty) {
         return res.json(null);
       } else {
