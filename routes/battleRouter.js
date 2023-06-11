@@ -285,12 +285,30 @@ battleRouter.get("/get-details-by-id", async (req, res) => {
     if (battleData.startedAt) {
       const isCompleted = isBattleCompleted(battleData.startedAt, battleData.timeValidity);
       if (isCompleted) {
-        return res.status(200).json({ status:"completed", ...battleData });
+        return res.status(200).json({ 
+          id:battleId,
+          status:"completed", 
+          ...battleData, 
+          createdAt:battleData?.createdAt?.toDate().toString(),
+          startedAt:battleData?.startedAt?.toDate().toString(),
+        });
       } else {
-        return res.status(200).json({ status:"arena", ...battleData });
+        return res.status(200).json({
+          id:battleId,
+          status:"arena",
+          ...battleData,
+          createdAt:battleData?.createdAt?.toDate().toString(),
+          startedAt:battleData?.startedAt?.toDate().toString(),
+        });
       }
     } else {
-      return res.status(200).json({ status:"lobby", ...battleData });
+      return res.status(200).json({
+        id:battleId,
+        status:"lobby",
+        ...battleData,
+        createdAt:battleData?.createdAt?.toDate().toString(),
+        startedAt:"",
+      });
     }
   } else {
     return res.json(null);
