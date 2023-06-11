@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const { decodeAccessToken } = require('../utils/firebase-utils');
+const isBattleCompleted = require('../utils/is-battle-completed');
 const userRouter = express.Router();
 
 /**
@@ -83,7 +84,7 @@ userRouter.post('/create-user', async (req, res) => {
       let userDefaultData = {
         email: decodedToken.email,
         name: decodedToken.name,
-        photoURL: decodedToken.picture
+        photoUrl: decodedToken.picture
       }
 
       db.collection('users').doc(uid).set(userDefaultData)
@@ -187,12 +188,17 @@ userRouter.get('/get-battle-id', async (req, res) => {
     try {
       const db = admin.firestore();
       const battlesRef = db.collection('battles');
-      const snapshot = await battlesRef.where('users', 'array-contains', decodedToken.user_id).limit(1).get();
+      const snapshot = await battlesRef.where('activeUsers', 'array-contains', decodedToken.user_id).limit(1).get();
       if (snapshot.empty) {
         return res.json(null);
       } else {
         const userBattles = snapshot.docs;
-        return res.send(userBattles[0].id);
+        const battleData = userBattles[0].data();
+        const isCompleted = isBattleCompleted(battleData.startedAt, battleData.timeValidity);
+        if (!isCompleted)
+          return res.send(userBattles[0].id);
+        else
+          return res.json(null);
       }
     } catch (error) {
       console.error('Error retrieving user battle:', error);
@@ -204,5 +210,57 @@ userRouter.get('/get-battle-id', async (req, res) => {
   }
 
 });
+
+/**
+ * @swagger
+ * /user/get-details-by-id:
+ *   get:
+ *     summary: Get user's data
+ *     tags:
+ *       - user
+ *     produces:
+ *       - application/json
+ *     parameters:
+ *       - name: user_id
+ *         description: ID of the user
+ *         in: query
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: User data
+ *       400:
+ *         description: User id required
+ *       404:
+ *         description: User Not Found
+ *       500:
+ *         description: Internal Server Error
+ */
+
+userRouter.get('/get-details-by-id', async (req, res) => {
+  const db = admin.firestore();
+
+  const userId = req.query.user_id;
+
+  if (!userId) {
+    return res.status(400).send('User Id Required');
+  }
+
+  const usersRef = db.collection('users').doc(userId);
+  usersRef
+    .get()
+    .then((doc) => {
+      if (doc.exists) {
+        const userData = doc.data();
+        res.status(200).json(userData);
+      } else {
+        res.status(404).send('User not found');
+      }
+    })
+    .catch((error) => {
+      console.error('Error getting user data:', error);
+      res.status(500).send('Internal Server Error');
+    });
+})
 
 module.exports = userRouter;
