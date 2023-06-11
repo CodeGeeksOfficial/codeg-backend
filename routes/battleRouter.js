@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const { decodeAccessToken } = require('../utils/firebase-utils');
+const isBattleCompleted = require('../utils/is-battle-completed');
 
 const battleRouter = express.Router()
 
@@ -215,21 +216,18 @@ battleRouter.get("/status", async (req, res) => {
 
   if (doc.exists) {
     const battleData = doc.data();
-    const createdAtTimestamp = battleData.createdAt.toDate();
-    const currentTimestamp = new Date();
-    const validTillTimestamp = new Date(createdAtTimestamp.getTime() + (battleData.timeValidity) * 60000);
-
-    if (validTillTimestamp > currentTimestamp) {
-      if (battleData.startedAt) {
-        return res.status(200).json({ status: "arena" });
+    if (battleData.startedAt) {
+      const isCompleted = isBattleCompleted(battleData.startedAt, battleData.timeValidity);
+      if (isCompleted) {
+        return res.status(200).json({ status: "completed" });
       } else {
-        return res.status(200).json({ status: "lobby" });
+        return res.status(200).json({ status: "arena" });
       }
     } else {
-      return res.status(200).json({ status: "completed" });
+      return res.status(200).json({ status: "lobby" });
     }
   } else {
-    return res.json(null);
+    return res.json({ status: null });
   }
 })
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const { decodeAccessToken } = require('../utils/firebase-utils');
+const isBattleCompleted = require('../utils/is-battle-completed');
 const userRouter = express.Router();
 
 /**
@@ -192,7 +193,12 @@ userRouter.get('/get-battle-id', async (req, res) => {
         return res.json(null);
       } else {
         const userBattles = snapshot.docs;
-        return res.send(userBattles[0].id);
+        const battleData = userBattles[0].data();
+        const isCompleted = isBattleCompleted(battleData.startedAt, battleData.timeValidity);
+        if (!isCompleted)
+          return res.send(userBattles[0].id);
+        else
+          return res.json(null);
       }
     } catch (error) {
       console.error('Error retrieving user battle:', error);
