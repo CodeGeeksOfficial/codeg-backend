@@ -102,7 +102,7 @@ battleRouter.post("/create-battle", async (req, res) => {
 /**
  * @swagger
  * /battle/join-battle:
- *   get:
+ *   post:
  *     summary: Join a battle in db
  *     description: joins a battle in db
  *     tags:
@@ -124,7 +124,7 @@ battleRouter.post("/create-battle", async (req, res) => {
  *         description: Internal Server Error
  */
 
-battleRouter.get("/join-battle", async (req, res) => {
+battleRouter.post("/join-battle", async (req, res) => {
   const accessToken = req.headers.authorization;
 
   try {
@@ -169,7 +169,7 @@ battleRouter.get("/join-battle", async (req, res) => {
 /**
  * @swagger
  * /battle/start-battle:
- *   get:
+ *   post:
  *     summary: Start a battle in db
  *     description: starts a battle in db
  *     tags:
@@ -191,7 +191,7 @@ battleRouter.get("/join-battle", async (req, res) => {
  *         description: Internal Server Error
  */
 
-battleRouter.get("/start-battle", async (req, res) => {
+battleRouter.post("/start-battle", async (req, res) => {
   const accessToken = req.headers.authorization;
 
   try {
@@ -294,6 +294,40 @@ battleRouter.get("/status", async (req, res) => {
     }
   } else {
     return res.json({ status: null });
+  }
+})
+
+/**
+ * @swagger
+ * /battle/get-public-battles:
+ *   get:
+ *     summary: Get public battles list
+ *     description: Returns all public battles' data
+ *     tags:
+ *       - battle
+ *     produces:
+ *       - application/json
+ *     responses:
+ *       200:
+ *         description: Success
+ *       500:
+ *         description: Internal Server Error
+ */
+battleRouter.get("/get-public-battles", async (req, res) => {
+  try {
+    const db = admin.firestore();
+
+    const battlesCollectionRef = db.collection('battles');
+  
+    let snapshot = await battlesCollectionRef.where('isPrivate','==',false).get()
+    let publicBattlesData = []
+    snapshot.docs.forEach((doc)=>{
+      publicBattlesData.push({id:doc.id,...doc.data()})
+    })
+    return res.status(200).json(publicBattlesData)
+  } catch (error) {
+    console.error('Error getting battle data:', error);
+    return res.status(500).send('Internal Server Error');
   }
 })
 
