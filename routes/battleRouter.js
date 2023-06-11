@@ -102,7 +102,7 @@ battleRouter.post("/create-battle", async (req, res) => {
 /**
  * @swagger
  * /battle/join-battle:
- *   get:
+ *   post:
  *     summary: Join a battle in db
  *     description: joins a battle in db
  *     tags:
@@ -169,7 +169,7 @@ battleRouter.post("/join-battle", async (req, res) => {
 /**
  * @swagger
  * /battle/start-battle:
- *   get:
+ *   post:
  *     summary: Start a battle in db
  *     description: starts a battle in db
  *     tags:
