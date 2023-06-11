@@ -12,13 +12,13 @@ const battleRouter = express.Router()
  *     payload:battle:
  *       type: object
  *       required:
- *         - admin_id
+ *         - no_of_questions
  *         - is_private
  *         - battle_name
  *         - time_validity
  *       properties:
- *         admin_id:
- *            type: "string"
+ *         no_of_questions:
+ *            type: "number"
  *         is_private:
  *            type: "boolean"
  *         battle_name:
@@ -60,9 +60,12 @@ battleRouter.post("/create-battle", async (req, res) => {
       const db = admin.firestore();
       const questionsSnapshot = await db.collection('questions').get();
       let questionsList = questionsSnapshot.docs.map((doc) => doc.id);
-
-      if (questionsList.length > 5) {
-        let questionsToRemove = questionsList.length - 5;
+      let noOfQuestions = 3;
+      if(req.body?.no_of_questions > 0 && req.body?.no_of_questions <= 5){
+        noOfQuestions = req.body?.no_of_questions
+      }
+      if (questionsList.length > noOfQuestions) {
+        let questionsToRemove = questionsList.length - noOfQuestions;
 
         while (questionsToRemove > 0) {
           const randomIndex = Math.floor(Math.random() * questionsList.length);
@@ -114,7 +117,7 @@ battleRouter.post("/create-battle", async (req, res) => {
  *         type: string
  *     responses:
  *       200:
- *         description: Battle created successfully
+ *         description: Joined Battle successfully
  *       401:
  *         description: Error verifying access token
  *       500:
@@ -142,30 +145,93 @@ battleRouter.get("/join-battle", async (req, res) => {
       .then(async (doc) => {
         if (doc.exists) {
           const battleData = doc.data();
+          // check for multiple entries
+          if(!battleData?.activeUsers.includes(decodedToken.user_id)){
+            battleDocRef.update({activeUsers:[...battleData?.activeUsers,decodedToken.user_id]})
+            return res.status(200).send('Joined Battle Successfully')
+          }else{
+            return res.status(200).send('Already a player')
+          }
+        } else {
+          return res.status(404).send('Battle not found');
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting battle data:', error);
+        return res.status(500).send('Internal Server Error');
+      });
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
+  }
+})
 
-          // Check if user already in battleId
-          const snapshot = await battlesCollectionRef.where('activeUsers', 'array-contains', decodedToken.user_id).limit(1).get();
-          if (snapshot.empty) {
-            // Check if battle already started or not
-            if (battleData.startedAt) {
-              // console.log("Battle already started !!")
-              return res.json(null);
-            } else {
-              battleDocRef.update({
-                players: [...battleData.players, { id: decodedToken.uid, score: 0 }],
-                activeUsers: [...battleData.activeUsers, decodedToken.uid]
-              }).then(() => {
-                // Join new user to battleId successfully
-                return res.json(battleId);
-              }).catch(() => {
-                return res.json(null);
-              })
-            }
-          } else {
-            // console.log("User already in a battle !!")
-            return res.json(null);
-            // const userBattles = snapshot.docs;
-            // return res.send(userBattles[0].id);
+/**
+ * @swagger
+ * /battle/start-battle:
+ *   get:
+ *     summary: Start a battle in db
+ *     description: starts a battle in db
+ *     tags:
+ *       - battle
+ *     security:
+ *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
+ *     parameters:
+ *       - name: battle_id
+ *         description: Battle id
+ *         in: query
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: Started Battle successfully
+ *       401:
+ *         description: Error verifying access token
+ *       500:
+ *         description: Internal Server Error
+ */
+
+battleRouter.get("/start-battle", async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    const db = admin.firestore();
+
+    const battleId = req.query.battle_id;
+
+    if (!battleId) {
+      return res.status(400).send('Battle Id Required');
+    }
+
+    // Check if doc for battleID exists
+    const battlesCollectionRef = db.collection('battles');
+    const battleDocRef = battlesCollectionRef.doc(battleId);
+    battleDocRef
+      .get()
+      .then(async (doc) => {
+        if (doc.exists) {
+          const battleData = doc.data();
+          // check for multiple startedAt key
+          if(!battleData?.startedAt && battleData?.activeUsers[0] === decodedToken.user_id){
+            let players = {}
+            battleData?.activeUsers.forEach((user)=>{
+              players = {
+                ...players,
+                [user]:{
+                  score:0,
+                  submissions:[]
+                }
+              }
+            })
+            console.log(players)
+            battleDocRef.update({
+              startedAt:new Date(),
+              players:players
+            })
+            return res.status(200).send('Started Battle Successfully')
+          }else{
+            return res.status(500).send('Internal Server Error');
           }
         } else {
           return res.status(404).send('Battle not found');
