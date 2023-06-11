@@ -249,10 +249,10 @@ battleRouter.post("/start-battle", async (req, res) => {
 
 /**
  * @swagger
- * /battle/status:
+ * /battle/get-details-by-id:
  *   get:
- *     summary: Status of a battle
- *     description: Returns the status of the battle
+ *     summary: Details of a battle
+ *     description: Returns all details of the battle
  *     tags:
  *       - battle
  *     parameters:
@@ -267,7 +267,7 @@ battleRouter.post("/start-battle", async (req, res) => {
  *       500:
  *         description: Internal Server Error
  */
-battleRouter.get("/status", async (req, res) => {
+battleRouter.get("/get-details-by-id", async (req, res) => {
 
   const db = admin.firestore();
   const battleId = req.query.battle_id;
@@ -285,15 +285,15 @@ battleRouter.get("/status", async (req, res) => {
     if (battleData.startedAt) {
       const isCompleted = isBattleCompleted(battleData.startedAt, battleData.timeValidity);
       if (isCompleted) {
-        return res.status(200).json({ status: "completed" });
+        return res.status(200).json({ status:"completed", ...battleData });
       } else {
-        return res.status(200).json({ status: "arena" });
+        return res.status(200).json({ status:"arena", ...battleData });
       }
     } else {
-      return res.status(200).json({ status: "lobby" });
+      return res.status(200).json({ status:"lobby", ...battleData });
     }
   } else {
-    return res.json({ status: null });
+    return res.json(null);
   }
 })
 
