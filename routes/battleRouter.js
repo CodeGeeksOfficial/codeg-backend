@@ -206,7 +206,31 @@ battleRouter.post("/start-battle", async (req, res) => {
 
     // Check if doc for battleID exists
     const battlesCollectionRef = db.collection('battles');
+    const usersCollectionRef = db.collection('users');
     const battleDocRef = battlesCollectionRef.doc(battleId);
+
+    const updateUsersCollection = async (activeUsersArray) => {
+      let playersData = activeUsersArray.map(async (userId)=>{
+        let userDocRef = usersCollectionRef.doc(userId)
+        let userProfileData = (await userDocRef.get()).data()
+        let userBattlesList = userProfileData?.battles || []
+        if(!userBattlesList.includes(battleId)){
+          await userDocRef.update({
+            battles:[...userBattlesList,battleId],
+          })
+        }
+        return new Promise((resolve,reject)=>{
+          resolve({
+            [userId]:{
+              score:0,
+              submissions:[]
+            }
+          })
+        })
+      })
+      return Promise.all(playersData)
+    }
+
     battleDocRef
       .get()
       .then(async (doc) => {
@@ -214,24 +238,87 @@ battleRouter.post("/start-battle", async (req, res) => {
           const battleData = doc.data();
           // check for multiple startedAt key
           if(!battleData?.startedAt && battleData?.activeUsers[0] === decodedToken.user_id){
-            let players = {}
-            battleData?.activeUsers.forEach((user)=>{
-              players = {
-                ...players,
-                [user]:{
-                  score:0,
-                  submissions:[]
-                }
-              }
+            let playersData = {}
+            let players = await updateUsersCollection(battleData?.activeUsers)
+            players.forEach((data)=>{
+              playersData = {...playersData,...data}
             })
-            console.log(players)
-            battleDocRef.update({
+            await battleDocRef.update({
               startedAt:new Date(),
-              players:players
+              players:playersData
             })
             return res.status(200).send('Started Battle Successfully')
           }else{
             return res.status(500).send('Internal Server Error');
+          }
+        } else {
+          return res.status(404).send('Battle not found');
+        }
+      })
+      .catch((error) => {
+        console.error('Error getting battle data:', error);
+        return res.status(500).send('Internal Server Error');
+      });
+  } catch (error) {
+    console.error('Error verifying access token:', error);
+    return res.status(401).send('Unauthorized');
+  }
+})
+
+/**
+ * @swagger
+ * /battle/remove-from-battle:
+ *   post:
+ *     summary: Remove user from battle
+ *     description: Remove user from battle in db
+ *     tags:
+ *       - battle
+ *     security:
+ *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
+ *     parameters:
+ *       - name: battle_id
+ *         description: Battle id
+ *         in: query
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: Removed from Battle Successfully
+ *       401:
+ *         description: Error verifying access token
+ *       500:
+ *         description: Internal Server Error
+ */
+
+battleRouter.post("/remove-from-battle", async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    const db = admin.firestore();
+
+    const battleId = req.query.battle_id;
+
+    if (!battleId) {
+      return res.status(400).send('Battle Id Required');
+    }
+
+    // Check if doc for battleID exists
+    const battlesCollectionRef = db.collection('battles');
+    const battleDocRef = battlesCollectionRef.doc(battleId);
+    battleDocRef
+      .get()
+      .then(async (doc) => {
+        if(doc.exists) {
+          const battleData = doc.data();
+          if(battleData?.activeUsers.includes(decodedToken.user_id)){
+            const newActiveUsersList = battleData?.activeUsers.filter((userId)=>{
+              return decodedToken.user_id !== userId
+            })
+            battleDocRef.update({activeUsers:newActiveUsersList})
+            return res.status(200).send('Removed Successfully')
+          }else{
+            return res.status(200).send('Not a participant')
           }
         } else {
           return res.status(404).send('Battle not found');
