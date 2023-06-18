@@ -3,11 +3,26 @@ const updateScoreAndRank = async (battlePlayersData,userId,scoreIncrement) => {
 
   battlePlayersData[userId].score = battlePlayersData[userId].score + scoreIncrement
   
+  const userObjectReference = battlePlayersData.userId;
   // Convert the object to an array of key-value pairs
   let entries = Object.entries(battlePlayersData);
 
   // Sort the array based on the "score" value
-  entries.sort((a, b) => b[1].score - a[1].score);
+  entries.sort((a, b) => {
+    // Get the score values
+    const scoreA = a[1].score;
+    const scoreB = b[1].score;
+
+    if (scoreA !== scoreB) {
+      // Sort based on the "score" value in descending order
+      return scoreB - scoreA;
+    } else {
+      // Keep the known object at last
+      if (a[1] === userObjectReference) return 1;
+      if (b[1] === userObjectReference) return -1;
+      return 0;
+    }
+  })
 
   let rankAllocator = 1
   entries = entries.map((player)=>{
