@@ -2,6 +2,8 @@ const express = require('express');
 const admin = require('firebase-admin');
 const { decodeAccessToken } = require('../utils/firebase-utils');
 const isBattleCompleted = require('../utils/is-battle-completed');
+const updateScoreAndRank = require('../utils/update-score-and-rank');
+const { getKey } = require('../controllers/redis-controllers');
 
 const battleRouter = express.Router()
 
@@ -25,6 +27,25 @@ const battleRouter = express.Router()
  *            type: "string"
  *         time_validity:
  *            type: "number"
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     payload:update-submission:
+ *       type: object
+ *       required:
+ *         - process_id
+ *         - battle_id 
+ *         - question_id 
+ *       properties:
+ *         process_id:
+ *           type: string
+ *         battle_id:
+ *           type: string
+ *         question_id:
+ *           type: string
  */
 
 /**
@@ -223,7 +244,7 @@ battleRouter.post("/start-battle", async (req, res) => {
           resolve({
             [userId]:{
               score:0,
-              submissions:[]
+              rank:null,
             }
           })
         })
@@ -267,6 +288,125 @@ battleRouter.post("/start-battle", async (req, res) => {
 
 /**
  * @swagger
+ * /battle/update-submission:
+ *   post:
+ *     summary: Update status of submitted code
+ *     description: Update the submission in firestore and give user respective score for that
+ *     tags:
+ *       - battle
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/payload:update-submission'
+ *     responses:
+ *       200:
+ *         description: Submission updated successfully
+ *       400:
+ *         description: Invalid request payload
+ *       500:
+ *         description: Internal Server Error
+ */
+
+battleRouter.post("/update-submission", async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  let reqData = {
+    processId:req.body.process_id,
+    battleId:req.body.battle_id,
+    questionId:req.body.question_id
+  };
+
+  if(reqData.processId === undefined || reqData.battleId === undefined ||reqData.questionId === undefined){
+    return res.status(400).send({error: "Invalid Request Payload"})
+  }
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    
+    try {
+      const db = admin.firestore();
+      const submissionsRef = db.collection('submissions')
+      const submissionDocRef = submissionsRef.doc(reqData?.processId)
+      const questionDocRef = db.collection('questions').doc(reqData?.questionId)
+      const promise1 = submissionDocRef.get();
+      const promise2 = questionDocRef.get();
+      const promise3 = getKey(reqData?.processId)
+      const submissionDoc = await promise1;
+      const questionDoc = await promise2;
+      const submissionResult = JSON.parse(await promise3);
+
+      if(submissionDoc.exists && questionDoc.exists && submissionResult){
+        const submissionDocData = submissionDoc.data()
+        const questionDocData = questionDoc.data()
+
+        let updatedSubmissionData = {
+          battleId:reqData?.battleId,
+          score:0,
+          status:submissionResult
+        }
+
+        let successTestCasesCount = 0
+        submissionResult.forEach((status)=>{
+          if (status === "Success") {
+            successTestCasesCount++;
+          }
+        })
+        // console.log(successTestCasesCount)
+
+        // Check if any one 'Success' test case
+        if(successTestCasesCount>0){
+          const submissionScore = ((Number(questionDocData?.points)/questionDocData?.testcases.length)*successTestCasesCount).toFixed(2)
+          updatedSubmissionData.score = submissionScore
+          // console.log(updatedSubmissionData)
+          const prevSubmissionsSnapshot = (await submissionsRef.where('questionId','==',reqData?.questionId).where('userId','==',submissionDocData.userId).where('battleId','==',reqData?.battleId).get()).docs
+          let previousSubmissionsWithHigherScore = prevSubmissionsSnapshot.filter((submission)=>{
+            return submission.data().score > submissionScore
+          })
+          if(prevSubmissionsSnapshot.length === 0 || previousSubmissionsWithHigherScore.length === 0){
+            // Rank increase
+            let scoreToBeIncremented = submissionScore
+            if(prevSubmissionsSnapshot.length !== 0){
+              let nextSmallerScore = prevSubmissionsSnapshot[0].data().score;
+              prevSubmissionsSnapshot.forEach((submission)=>{
+                if(submission.data().score > nextSmallerScore){
+                  nextSmallerScore = submission.data().score
+                }
+              })
+              scoreToBeIncremented = (submissionScore - nextSmallerScore).toFixed(2)
+            }
+            // console.log('Score to increase: ', scoreToBeIncremented)
+            const battleDocRef = db.collection('battles').doc(reqData?.battleId)
+            const battleDoc = await battleDocRef.get()
+            let battleDocData = battleDoc.data();
+            let newBattlePlayersLeaderboard = await updateScoreAndRank(battleDocData.players,submissionDocData.userId,scoreToBeIncremented)
+
+            // Update new leaderboard with updated ranks and scores
+            await battleDocRef.update({players:newBattlePlayersLeaderboard})
+            // console.log(newBattlePlayersLeaderboard)
+          }
+        }
+
+        // Update submission doc with updatedSubmissionData
+        await submissionDocRef.update(updatedSubmissionData)
+        return res.status(200).send({message:"Submission Updated Successfully"})
+      }else{
+        return res.status(400).send({error: "Invalid IDs in Request Payload"})
+      }
+    } catch(error) {
+      console.log(error);
+      return res.status(500).send("Internal Server Error")
+    }
+  } catch (error) {
+    return res.status(401).send({ error: "Unauthorized" });
+  }
+})
+
+/**
+ * @swagger
  * /battle/remove-from-battle:
  *   post:
  *     summary: Remove user from battle
@@ -277,7 +417,12 @@ battleRouter.post("/start-battle", async (req, res) => {
  *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
  *     parameters:
  *       - name: battle_id
- *         description: Battle id
+ *         description: Battle Id
+ *         in: query
+ *         required: true
+ *         type: string
+ *       - name: user_id
+ *         description: User Id
  *         in: query
  *         required: true
  *         type: string
@@ -295,42 +440,49 @@ battleRouter.post("/remove-from-battle", async (req, res) => {
 
   try {
     const decodedToken = await decodeAccessToken(accessToken);
-    const db = admin.firestore();
 
-    const battleId = req.query.battle_id;
+    try{
+      const db = admin.firestore();
 
-    if (!battleId) {
-      return res.status(400).send('Battle Id Required');
-    }
+      const battleId = req.query.battle_id;
+      const userIdQuery = req.query.user_id;
 
-    // Check if doc for battleID exists
-    const battlesCollectionRef = db.collection('battles');
-    const battleDocRef = battlesCollectionRef.doc(battleId);
-    battleDocRef
-      .get()
-      .then(async (doc) => {
-        if(doc.exists) {
-          const battleData = doc.data();
-          if(battleData?.activeUsers.includes(decodedToken.user_id)){
-            const newActiveUsersList = battleData?.activeUsers.filter((userId)=>{
-              return decodedToken.user_id !== userId
+      if (!battleId) {
+        return res.status(400).send('Battle Id Required');
+      }
+
+      if (!userIdQuery) {
+        return res.status(400).send('User Id Required');
+      }
+
+      // Check if doc for battleID exists
+      const battleDocRef = db.collection('battles').doc(battleId)
+      const battleDocRes = await battleDocRef.get();
+      if(battleDocRes.exists) {
+        const battleData = battleDocRes.data();
+        if(battleData?.activeUsers.includes(userIdQuery)){
+          if(decodedToken.user_id === userIdQuery || decodedToken.user_id === battleData?.activeUsers[0]){
+            const newActiveUsersList = battleData?.activeUsers.filter((battleUserId)=>{
+              return userIdQuery !== battleUserId
             })
-            battleDocRef.update({activeUsers:newActiveUsersList})
-            return res.status(200).send('Removed Successfully')
+            await battleDocRef.update({activeUsers:newActiveUsersList})
+            return res.status(200).send({message: 'Removed Successfully'})
           }else{
-            return res.status(200).send('Not a participant')
+            return res.status(404).send({ error: 'Not Authorized to remove'})
           }
-        } else {
-          return res.status(404).send('Battle not found');
+        }else{
+          return res.status(404).send({ error: 'Not a participant'})
         }
-      })
-      .catch((error) => {
-        console.error('Error getting battle data:', error);
-        return res.status(500).send('Internal Server Error');
-      });
+      } else {
+        return res.status(404).send({ error: 'Battle not found'})
+      }
+    }catch(error){
+      console.error('Error getting battle data:', error)
+      return res.status(500).send({ error: 'Internal Server Error'})
+    }
   } catch (error) {
-    console.error('Error verifying access token:', error);
-    return res.status(401).send('Unauthorized');
+    console.error('Error verifying access token:', error)
+    return res.status(401).send({ error: 'Unauthorized'})
   }
 })
 
