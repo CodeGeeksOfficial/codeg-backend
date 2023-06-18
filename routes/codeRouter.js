@@ -2,6 +2,7 @@ const express = require('express');
 const { getKey, setKey } = require('../controllers/redis-controllers')
 const { sendInQueue } = require('../controllers/rabbitmq-controllers')
 const { randomBytes } = require('crypto');
+const { decodeAccessToken } = require('../utils/firebase-utils');
 const admin = require('firebase-admin');
 
 const codeRouter = express.Router();
@@ -127,6 +128,8 @@ codeRouter.post("/run", async (req, res) => {
  *     description: Post the code with payload containing language, code, test_inputs and timeout and question_id as param
  *     tags:
  *       - code
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: question_id
@@ -221,6 +224,8 @@ codeRouter.post("/question-run", async (req, res) => {
  *     description: Post the code with payload containing language, code and timeout and question_id as param
  *     tags:
  *       - code
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: question_id
@@ -243,64 +248,84 @@ codeRouter.post("/question-run", async (req, res) => {
 
 codeRouter.post("/question-submit", async (req, res) => {
   const folder_name = randomBytes(20).toString("hex"); // Random Folder name
+  const accessToken = req.headers.authorization;
+
   try {
-    const question_id = req.query.question_id;
-    if (!question_id) {
-      return res.status(400).send({ error: "Question Id is required" });
-    }
-
-    // Extract Data received from the request body
-    let data = {
-      input_code: {
-        language: req.body.language,
-        code: req.body.code,
-      },
-      folder_name: folder_name,
-      timeout: req.body.timeout,
-    };
-
-    // If language is not received, return 400 BAD Request
-    if (data.input_code.language === undefined) {
-      return res.status(400).send({ error: "Language Not Received" });
-    }
-
-    if (!LANGUAGES.includes(data.input_code.language)) {
-      return res.status(400).send({ error: "Language Not Supported" });
-    }
-
-    // If code is not received, return 400 BAD Request
-    if (data.input_code.code === undefined) {
-      return res.status(400).send({ error: "Code Not Received" });
-    }
-
-    // If timeout is not received, set it to 15 sec
-    if (data.timeout === undefined) {
-      data.timeout = 15000;
-    }
-
-    const db = admin.firestore();
-    const questionRef = db.collection('questions').doc(question_id);
-    const doc = await questionRef.get();
-    if (doc.exists) {
-      const questionData = doc.data();
-      if (questionData.testcases && questionData.solution) {
-        data.solution = questionData.solution[0];
-        data.test_inputs = questionData.testcases;
-      } else {
-        return res.status(500).send('Invalid Question in db');
+    const decodedToken = await decodeAccessToken(accessToken);
+    try {
+      const question_id = req.query.question_id;
+      if (!question_id) {
+        return res.status(400).send({ error: "Question Id is required" });
       }
-    } else {
-      return res.status(404).send('Question not found');
+
+      // Extract Data received from the request body
+      let data = {
+        input_code: {
+          language: req.body.language,
+          code: req.body.code,
+        },
+        folder_name: folder_name,
+        timeout: req.body.timeout,
+      };
+
+      // If language is not received, return 400 BAD Request
+      if (data.input_code.language === undefined) {
+        return res.status(400).send({ error: "Language Not Received" });
+      }
+
+      if (!LANGUAGES.includes(data.input_code.language)) {
+        return res.status(400).send({ error: "Language Not Supported" });
+      }
+
+      // If code is not received, return 400 BAD Request
+      if (data.input_code.code === undefined) {
+        return res.status(400).send({ error: "Code Not Received" });
+      }
+
+      // If timeout is not received, set it to 15 sec
+      if (data.timeout === undefined) {
+        data.timeout = 15000;
+      }
+
+      const db = admin.firestore();
+      const questionRef = db.collection('questions').doc(question_id);
+      const doc = await questionRef.get();
+      if (doc.exists) {
+        const questionData = doc.data();
+        if (questionData.testcases && questionData.solution) {
+          data.solution = questionData.solution[0];
+          data.test_inputs = questionData.testcases;
+        } else {
+          return res.status(500).send('Invalid Question in db');
+        }
+      } else {
+        return res.status(404).send('Question not found');
+      }
+
+      // *** Prepare data and Push in Queue *** //
+
+      // TODO: commented only for testing, to be removed
+      await sendInQueue("multiExecutionJobs", JSON.stringify(data));
+      await setKey(folder_name, "Queued");
+
+      console.log(`Request ${folder_name} received - multiExecutionJobs`);
+
+      // Create submission in firestore with docId as folder_name
+      const newSubmissionDocRef = db.collection('submissions').doc(folder_name);
+      let submissionData = {
+        createdAt: new Date(),
+        solution: data?.input_code,
+        timeout:data?.timeout,
+        questionId:question_id,
+        userId:decodedToken?.user_id
+      }
+      await newSubmissionDocRef.set(submissionData)
+    } catch (err) {
+      console.log(err);
+      return res.status(500).send({ error: `Internal Server Error: ${err}` });
     }
-
-    // *** Prepare data and Push in Queue *** //
-    await sendInQueue("multiExecutionJobs", JSON.stringify(data));
-    await setKey(folder_name, "Queued");
-
-    console.log(`Request ${folder_name} received - multiExecutionJobs`);
-  } catch (err) {
-    console.log(err);
-    return res.status(500).send({ error: `Internal Server Error: ${err}` });
+  } catch (error) {
+    return res.status(401).send({ error: "Unauthorized" });
   }
 
   res.status(200).send(folder_name);
