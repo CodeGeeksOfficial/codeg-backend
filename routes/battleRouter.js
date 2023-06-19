@@ -556,6 +556,66 @@ battleRouter.get("/get-details-by-id", async (req, res) => {
 
 /**
  * @swagger
+ * /battle/get-user-submissions:
+ *   get:
+ *     summary: Submissions by user in battle
+ *     description: Returns details of all submissions done by the use in this battleId
+ *     tags:
+ *       - battle
+ *     security:
+ *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
+ *     parameters:
+ *       - name: battle_id
+ *         description: Battle id
+ *         in: query
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: All battle submissions data
+ *       500:
+ *         description: Internal Server Error
+ */
+
+battleRouter.get("/get-user-submissions", async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    const battleId = req.query.battle_id;
+
+    if (!battleId) {
+      return res.status(400).send('Battle Id Required');
+    }
+
+    try {
+      const db = admin.firestore();
+      const submissionsRef = db.collection('submissions')
+      const allSubmissionsSnapshot = (await submissionsRef.where('battleId','==',battleId).where('userId','==',decodedToken?.user_id).get()).docs
+      let allSubmissionsData = allSubmissionsSnapshot.filter((submission)=>{
+        const submissionData = submission.data()
+        return (submissionData?.status && submissionData?.score)
+      })
+      allSubmissionsData = allSubmissionsData.map((submission)=>{
+        const submissionData = submission.data()
+        return {
+          submissionId:submission.id,
+          ...submissionData
+        }
+      })
+      return res.status(200).json(allSubmissionsData)
+    } catch (error) {
+      console.error('Error getting submission/battle data:', error)
+      return res.status(500).send({ error: 'Internal Server Error'})
+    }
+  } catch (error) {
+    console.error('Error verifying access token:', error)
+    return res.status(401).send({ error: 'Unauthorized'})
+  }
+})
+
+/**
+ * @swagger
  * /battle/get-public-battles:
  *   get:
  *     summary: Get public battles list
