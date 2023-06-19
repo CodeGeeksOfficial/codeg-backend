@@ -188,15 +188,16 @@ userRouter.get('/get-battle-id', async (req, res) => {
     try {
       const db = admin.firestore();
       const battlesRef = db.collection('battles');
-      const snapshot = await battlesRef.where('activeUsers', 'array-contains', decodedToken.user_id).limit(1).get();
+      const snapshot = await battlesRef.where('activeUsers', 'array-contains', decodedToken.user_id).get();
       if (snapshot.empty) {
         return res.json(null);
       } else {
-        const userBattles = snapshot.docs;
-        const battleData = userBattles[0].data();
-        const isCompleted = isBattleCompleted(battleData.startedAt, battleData.timeValidity);
-        if (!isCompleted)
-          return res.send(userBattles[0].id);
+        const usersAllBattles = snapshot.docs;
+        const userCurrentBattles = usersAllBattles.filter((battle)=>{
+          return !(battle.data()?.startedAt && isBattleCompleted(battle.data()?.startedAt, battle.data().timeValidity))
+        })
+        if (userCurrentBattles.length !==0)
+          return res.send(userCurrentBattles[0].id);
         else
           return res.json(null);
       }
