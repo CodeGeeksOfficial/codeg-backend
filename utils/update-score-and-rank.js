@@ -1,7 +1,7 @@
 // Returns new leader board (player data in battle doc) after updating single player's rank and score
 const updateScoreAndRank = async (battlePlayersData,userId,scoreIncrement) => {
 
-  battlePlayersData[userId].score = battlePlayersData[userId].score + scoreIncrement
+  battlePlayersData[userId].score = (Number(battlePlayersData[userId].score) + Number(scoreIncrement)).toString()
   
   const userObjectReference = battlePlayersData.userId;
   // Convert the object to an array of key-value pairs
