@@ -206,7 +206,6 @@ userRouter.get('/get-battle-id', async (req, res) => {
       return res.status(500).send('Internal Server Error');
     }
   } catch (error) {
-    console.error('Error verifying access token:', error);
     return res.status(401).send('Unauthorized');
   }
 
