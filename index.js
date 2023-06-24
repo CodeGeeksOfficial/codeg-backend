@@ -2,6 +2,7 @@
 const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
+const { logger } = require('./middleware/memoryLog')
 
 // Routers Imports
 const codeRouter = require('./routes/codeRouter')
@@ -34,6 +35,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
+// Middleware: Server status logs
+app.use(logger)
 
 // Routers
 app.use("/question", questionRouter);
