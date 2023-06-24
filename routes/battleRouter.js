@@ -33,7 +33,7 @@ const battleRouter = express.Router()
  * @swagger
  * components:
  *   schemas:
- *     payload:update-submission:
+ *     payload:update-battle-submission:
  *       type: object
  *       required:
  *         - process_id
@@ -301,7 +301,7 @@ battleRouter.post("/start-battle", async (req, res) => {
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/payload:update-submission'
+ *             $ref: '#/components/schemas/payload:update-battle-submission'
  *     responses:
  *       200:
  *         description: Submission updated successfully

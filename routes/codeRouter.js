@@ -27,6 +27,21 @@ const LANGUAGES = ["cpp", "java", "py", "js"];
  *           type: number
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     payload:update-practice-submission:
+ *       type: object
+ *       required:
+ *         - process_id
+ *         - question_id 
+ *       properties:
+ *         process_id:
+ *           type: string
+ *         question_id:
+ *           type: string
+ */
 
 /**
  * @swagger
@@ -329,6 +344,94 @@ codeRouter.post("/question-submit", async (req, res) => {
   }
 
   res.status(200).send(folder_name);
+})
+
+/**
+ * @swagger
+ * /code/update-submission:
+ *   post:
+ *     summary: Update status of submitted code
+ *     description: Update the submission in firestore and give user respective score for that
+ *     tags:
+ *       - code
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/payload:update-practice-submission'
+ *     responses:
+ *       200:
+ *         description: Submission updated successfully
+ *       400:
+ *         description: Invalid request payload
+ *       500:
+ *         description: Internal Server Error
+ */
+
+codeRouter.post("/update-submission", async (req, res) => {
+  const accessToken = req.headers.authorization;
+
+  let reqData = {
+    processId:req.body.process_id,
+    questionId:req.body.question_id
+  };
+
+  if(reqData.processId === undefined ||reqData.questionId === undefined){
+    return res.status(400).send({error: "Invalid Request Payload"})
+  }
+
+  try {
+    const decodedToken = await decodeAccessToken(accessToken);
+    
+    try {
+      const db = admin.firestore();
+      const submissionsRef = db.collection('submissions')
+      const submissionDocRef = submissionsRef.doc(reqData?.processId)
+      const questionDocRef = db.collection('questions').doc(reqData?.questionId)
+      const promise1 = submissionDocRef.get();
+      const promise2 = questionDocRef.get();
+      const promise3 = getKey(reqData?.processId)
+      const submissionDoc = await promise1;
+      const questionDoc = await promise2;
+      const submissionResult = JSON.parse(await promise3);
+
+      if(submissionDoc.exists && questionDoc.exists && submissionResult){
+        const questionDocData = questionDoc.data()
+
+        let updatedSubmissionData = {
+          score:"0",
+          status:submissionResult
+        }
+
+        let successTestCasesCount = 0
+        submissionResult.forEach((status)=>{
+          if (status === "Success") {
+            successTestCasesCount++;
+          }
+        })
+
+        // Check if any one 'Success' test case
+        if(successTestCasesCount>0){
+          const submissionScore = ((Number(questionDocData?.points)/questionDocData?.testcases.length)*successTestCasesCount).toFixed(2)
+          updatedSubmissionData.score = submissionScore
+        }
+
+        // Update submission doc with updatedSubmissionData
+        await submissionDocRef.update(updatedSubmissionData)
+        return res.status(200).send({message:"Submission Updated Successfully"})
+      }else{
+        return res.status(400).send({error: "Invalid IDs in Request Payload"})
+      }
+    } catch(error) {
+      console.log(error);
+      return res.status(500).send("Internal Server Error")
+    }
+  } catch (error) {
+    return res.status(401).send({ error: "Unauthorized" });
+  }
 })
 
 /**
