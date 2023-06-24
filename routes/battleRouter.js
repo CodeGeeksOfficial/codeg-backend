@@ -33,7 +33,7 @@ const battleRouter = express.Router()
  * @swagger
  * components:
  *   schemas:
- *     payload:update-submission:
+ *     payload:update-battle-submission:
  *       type: object
  *       required:
  *         - process_id
@@ -115,7 +115,6 @@ battleRouter.post("/create-battle", async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Error verifying access token:', error);
     return res.status(401).send('Unauthorized');
   }
 })
@@ -281,7 +280,6 @@ battleRouter.post("/start-battle", async (req, res) => {
         return res.status(500).send('Internal Server Error');
       });
   } catch (error) {
-    console.error('Error verifying access token:', error);
     return res.status(401).send('Unauthorized');
   }
 })
@@ -301,7 +299,7 @@ battleRouter.post("/start-battle", async (req, res) => {
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/payload:update-submission'
+ *             $ref: '#/components/schemas/payload:update-battle-submission'
  *     responses:
  *       200:
  *         description: Submission updated successfully
@@ -481,7 +479,6 @@ battleRouter.post("/remove-from-battle", async (req, res) => {
       return res.status(500).send({ error: 'Internal Server Error'})
     }
   } catch (error) {
-    console.error('Error verifying access token:', error)
     return res.status(401).send({ error: 'Unauthorized'})
   }
 })
@@ -609,7 +606,6 @@ battleRouter.get("/get-user-submissions", async (req, res) => {
       return res.status(500).send({ error: 'Internal Server Error'})
     }
   } catch (error) {
-    console.error('Error verifying access token:', error)
     return res.status(401).send({ error: 'Unauthorized'})
   }
 })
@@ -645,6 +641,69 @@ battleRouter.get("/get-public-battles", async (req, res) => {
   } catch (error) {
     console.error('Error getting battle data:', error);
     return res.status(500).send('Internal Server Error');
+  }
+})
+
+/**
+ * @swagger
+ * /battle/delete-battle:
+ *   post:
+ *     summary: Delete a battle
+ *     description: Deletes a battle with no participants and which was never started
+ *     tags:
+ *       - battle
+ *     security:
+ *       - bearerAuth: []   # Indicates that the API requires a bearer token in the header
+ *     parameters:
+ *       - name: battle_id
+ *         description: Battle id
+ *         in: query
+ *         required: true
+ *         type: string
+ *     responses:
+ *       200:
+ *         description: Battle deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal Server Error
+ */
+
+battleRouter.post("/delete-battle", async (req,res) => {
+  const accessToken = req.headers.authorization;
+
+  try {
+    const decodedToken = decodeAccessToken(accessToken)
+    const battleId = req.query.battle_id
+
+    if (!battleId) {
+      return res.status(400).send('Battle Id Required');
+    }
+
+    try {
+      const db = admin.firestore();
+      const battlesCollectionRef = db.collection('battles');
+      const battleDocRef = battlesCollectionRef.doc(battleId)
+      const battleDocRes = await battleDocRef.get();
+      if(battleDocRes.exists) {
+        const battleData = battleDocRes.data()
+
+        // Check if no particapants and if battle has ever started or not
+        if(battleData?.activeUsers.length === 0 && !battleData.startedAt){
+          await battleDocRef.delete()
+          return res.status(200).send({message: 'Battle deleted successfully'})
+        }else{
+          return res.status(404).send({ error: 'Cannot delete this battle'})
+        }
+      }else{
+        return res.status(404).send({ error: 'Battle not found'})
+      }
+    } catch (error) {
+      console.error('Error getting submission/battle data:', error)
+      return res.status(500).send({ error: 'Internal Server Error'})
+    }
+  } catch (error) {
+    return res.status(401).send({ error: 'Unauthorized'})
   }
 })
 
