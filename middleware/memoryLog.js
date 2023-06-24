@@ -10,8 +10,10 @@ const logger = (req,res,next) => {
       heapUsed: `${formatMemoryUsage(memoryData.heapUsed)} -> actual memory used during the execution`,
       external: `${formatMemoryUsage(memoryData.external)} -> V8 external memory`,
     };
-    console.log(`[${timeStamp}]:`,memoryUsage);
-    next()
+    console.log(`[${timeStamp}]:`);
+    console.log(req.originalUrl);
+    console.log(memoryUsage);
+    next();
 }
 
 module.exports = { logger }

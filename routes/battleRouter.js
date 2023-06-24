@@ -345,7 +345,7 @@ battleRouter.post("/update-submission", async (req, res) => {
 
         let updatedSubmissionData = {
           battleId:reqData?.battleId,
-          score:0,
+          score:"0",
           status:submissionResult
         }
 
