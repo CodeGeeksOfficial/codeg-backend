@@ -362,7 +362,7 @@ battleRouter.post("/update-submission", async (req, res) => {
           // console.log(updatedSubmissionData)
           const prevSubmissionsSnapshot = (await submissionsRef.where('questionId','==',reqData?.questionId).where('userId','==',submissionDocData.userId).where('battleId','==',reqData?.battleId).get()).docs
           let previousSubmissionsWithHigherScore = prevSubmissionsSnapshot.filter((submission)=>{
-            return submission.data().score > submissionScore
+            return Number(submission.data().score) > submissionScore
           })
           if(prevSubmissionsSnapshot.length === 0 || previousSubmissionsWithHigherScore.length === 0){
             // Rank increase
